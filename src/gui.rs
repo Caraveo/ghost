@@ -351,8 +351,25 @@ fn render_input(ui: &mut Ui, app: &mut App, c: &ThemeColors) {
                     handle_enter(app);
                 }
             }
-            if !pty_active && app.input_focused && !resp.has_focus() { resp.request_focus(); }
-            app.input_focused = false;
+            // Keep the shell ready for typing. A one-shot focus request can be
+            // ignored while the native window is still activating, so retry
+            // until egui confirms focus. Do not steal it from modal surfaces
+            // or the built-in editor.
+            let shell_can_focus = !pty_active
+                && !app.show_editor
+                && !app.show_settings
+                && !app.show_help
+                && !app.confirm_mode;
+            let no_widget_focused = ui.ctx().memory(|memory| memory.focused().is_none());
+            if shell_can_focus
+                && !resp.has_focus()
+                && (app.input_focused || no_widget_focused)
+            {
+                resp.request_focus();
+                app.input_focused = true;
+            } else if resp.has_focus() {
+                app.input_focused = false;
+            }
 
             if !pty_active && resp.has_focus() && ui.input(|i| i.key_pressed(Key::Tab)) { handle_tab(app); }
             if !pty_active && resp.has_focus() {
