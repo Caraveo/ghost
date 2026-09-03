@@ -16,6 +16,19 @@
 
 Ghost runs commands in its own macOS window instead of wrapping the Terminal app. Everyday operations can run through its built-in command engine, while interactive programs such as OpenCode and Grok run in dedicated terminal-emulation tabs.
 
+## Quick Install
+
+Ghost currently targets macOS. Install the Rust toolchain and Apple command-line developer tools, then run:
+
+```sh
+git clone https://github.com/Caraveo/ghost.git
+cd ghost
+./build_app.sh
+open Ghost.app
+```
+
+`build_app.sh` creates an optimized release build, assembles `Ghost.app`, compiles the native SwiftUI settings component, and generates the application icon set.
+
 ## Highlights
 
 - More than 80 built-in commands for files, text, archives, networking, hashing, and system information
@@ -30,20 +43,9 @@ Ghost runs commands in its own macOS window instead of wrapping the Terminal app
 - Dark Cyan, Matrix, Solarized, Gruvbox, and Light themes
 - Native macOS settings and menus
 
-## Build and run
+## Development
 
-Ghost currently targets macOS. You need the Rust toolchain and Apple command-line developer tools installed.
-
-```sh
-git clone https://github.com/Caraveo/ghost.git
-cd ghost
-./build_app.sh
-open Ghost.app
-```
-
-`build_app.sh` creates a release build, assembles `Ghost.app`, compiles the native settings component, and generates the application icon set.
-
-For a quick development check without assembling the app bundle:
+For a development check without assembling the app bundle:
 
 ```sh
 cargo check
