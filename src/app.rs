@@ -227,7 +227,7 @@ impl App {
             selected_history: None,
             input_focused: true,
             status_message: String::new(),
-            theme: Theme::DarkCyan,
+            theme: Theme::Light,
             git_branch: String::new(),
             git_dirty: false,
             clipboard_text: String::new(),

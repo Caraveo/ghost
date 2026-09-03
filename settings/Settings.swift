@@ -4,7 +4,7 @@ import Cocoa
 // MARK: - Settings Model
 
 struct GhostSettings: Codable {
-    var theme: String = "DarkCyan"
+    var theme: String = "Light"
     var font_size: Double = 13.0
     var pty_cols: Int = 120
     var pty_rows: Int = 40
@@ -223,6 +223,16 @@ func ghost_setup_menu() {
         editSubmenu.addItem(withTitle: "Select All", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
         editMenu.submenu = editSubmenu
         mainMenu.addItem(editMenu)
+
+        // Dedicated Settings menu for discoverability. The conventional
+        // Command-, item remains available in the Ghost application menu.
+        let settingsMenu = NSMenuItem(title: "Settings", action: nil, keyEquivalent: "")
+        let settingsSubmenu = NSMenu(title: "Settings")
+        let openSettingsItem = NSMenuItem(title: "Open Settings…", action: #selector(GhostMenuTarget.showSettings), keyEquivalent: "")
+        openSettingsItem.target = GhostMenuTarget.shared
+        settingsSubmenu.addItem(openSettingsItem)
+        settingsMenu.submenu = settingsSubmenu
+        mainMenu.addItem(settingsMenu)
 
         // View menu
         let viewMenu = NSMenuItem(title: "View", action: nil, keyEquivalent: "")

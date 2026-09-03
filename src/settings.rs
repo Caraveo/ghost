@@ -30,7 +30,7 @@ pub struct SettingsFile {
     pub safety: bool,
 }
 
-fn default_theme() -> String { "DarkCyan".into() }
+fn default_theme() -> String { "Light".into() }
 fn default_font_size() -> f64 { 13.0 }
 fn default_pty_cols() -> i64 { 120 }
 fn default_pty_rows() -> i64 { 40 }
