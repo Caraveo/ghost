@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="ghost%20Exports/ghost-macOS-Dock-1024x1024.png" width="144" alt="Ghost app icon">
+  <img src="assets/ghost-banner.png" alt="Ghost — native macOS shell with responsive terminal emulation">
 </p>
 
 <h1 align="center">Ghost</h1>
