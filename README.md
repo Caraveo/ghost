@@ -18,16 +18,17 @@ Ghost runs commands in its own macOS window instead of wrapping the Terminal app
 
 ## Quick Install
 
-Ghost currently targets macOS. Install the Rust toolchain and Apple command-line developer tools, then run:
+Download the latest signed universal macOS build from [Releases](https://github.com/Caraveo/ghost/releases/latest), unzip it, and drag **Ghost.app** into **Applications**.
+
+Or install it from Terminal:
 
 ```sh
-git clone https://github.com/Caraveo/ghost.git
-cd ghost
-./build_app.sh
+curl -L https://github.com/Caraveo/ghost/releases/latest/download/Ghost-macOS-universal.zip -o Ghost.zip
+ditto -x -k Ghost.zip .
 open Ghost.app
 ```
 
-`build_app.sh` creates an optimized release build, assembles `Ghost.app`, compiles the native SwiftUI settings component, and generates the application icon set.
+The release is signed with a Developer ID certificate and supports both Apple Silicon and Intel Macs.
 
 ## Highlights
 
@@ -45,11 +46,13 @@ open Ghost.app
 
 ## Development
 
-For a development check without assembling the app bundle:
+To build Ghost from source, install the Rust toolchain and Apple command-line developer tools:
 
 ```sh
 cargo check
 cargo test
+./build_app.sh
+open Ghost.app
 ```
 
 ## Using Ghost

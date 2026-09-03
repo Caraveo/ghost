@@ -1,36 +1,52 @@
 #!/bin/bash
-set -e
+set -euo pipefail
 
 PROJECT_DIR="$(cd "$(dirname "$0")" && pwd)"
 APP_BUNDLE="$PROJECT_DIR/Ghost.app"
 CONTENTS="$APP_BUNDLE/Contents"
 
-echo "==> Building ghost (release)..."
-cargo build --release --manifest-path "$PROJECT_DIR/Cargo.toml"
+if [ "${UNIVERSAL:-0}" = "1" ]; then
+    echo "==> Building ghost universal release..."
+    cargo build --release --target x86_64-apple-darwin --manifest-path "$PROJECT_DIR/Cargo.toml"
+    cargo build --release --target aarch64-apple-darwin --manifest-path "$PROJECT_DIR/Cargo.toml"
+else
+    echo "==> Building ghost (release)..."
+    cargo build --release --manifest-path "$PROJECT_DIR/Cargo.toml"
+fi
 
 echo "==> Assembling .app bundle..."
 mkdir -p "$CONTENTS/MacOS" "$CONTENTS/Resources" "$CONTENTS/Frameworks"
 
-# Copy binary
-cp "$PROJECT_DIR/target/release/ghost" "$CONTENTS/MacOS/ghost"
+# Copy or combine the executable.
+if [ "${UNIVERSAL:-0}" = "1" ]; then
+    lipo -create \
+        "$PROJECT_DIR/target/x86_64-apple-darwin/release/ghost" \
+        "$PROJECT_DIR/target/aarch64-apple-darwin/release/ghost" \
+        -output "$CONTENTS/MacOS/ghost"
+else
+    cp "$PROJECT_DIR/target/release/ghost" "$CONTENTS/MacOS/ghost"
+fi
 chmod +x "$CONTENTS/MacOS/ghost"
 
 # Compile Swift settings panel
 echo "==> Compiling Swift settings panel..."
 SWIFT_SRC="$PROJECT_DIR/settings/Settings.swift"
 SWIFT_OUT="$CONTENTS/Frameworks/libghost_settings.dylib"
-ARCH=$(uname -m)
-if [ "$ARCH" = "arm64" ]; then
-    SWIFT_TARGET="arm64-apple-macos13.0"
+if [ "${UNIVERSAL:-0}" = "1" ]; then
+    SWIFT_X86="${TMPDIR:-/tmp}/libghost_settings_x86_64.dylib"
+    SWIFT_ARM="${TMPDIR:-/tmp}/libghost_settings_arm64.dylib"
+    swiftc -emit-library "$SWIFT_SRC" -o "$SWIFT_X86" \
+        -framework SwiftUI -framework Cocoa -target x86_64-apple-macos13.0 -O
+    swiftc -emit-library "$SWIFT_SRC" -o "$SWIFT_ARM" \
+        -framework SwiftUI -framework Cocoa -target arm64-apple-macos13.0 -O
+    lipo -create "$SWIFT_X86" "$SWIFT_ARM" -output "$SWIFT_OUT"
+    rm -f "$SWIFT_X86" "$SWIFT_ARM"
+    echo "    Swift settings panel compiled (universal)"
 else
-    SWIFT_TARGET="x86_64-apple-macos13.0"
-fi
-swiftc -emit-library "$SWIFT_SRC" \
-    -o "$SWIFT_OUT" \
-    -framework SwiftUI -framework Cocoa \
-    -target "$SWIFT_TARGET" \
-    -O 2>&1 || echo "    Swift compilation failed, native settings disabled"
-if [ -f "$SWIFT_OUT" ]; then
+    ARCH=$(uname -m)
+    SWIFT_TARGET="${ARCH}-apple-macos13.0"
+    swiftc -emit-library "$SWIFT_SRC" -o "$SWIFT_OUT" \
+        -framework SwiftUI -framework Cocoa -target "$SWIFT_TARGET" -O
     echo "    Swift settings panel compiled ($ARCH)"
 fi
 
@@ -70,6 +86,16 @@ fi
 # Refresh system icon cache
 if command -v touch &>/dev/null; then
     touch "$APP_BUNDLE"
+fi
+
+if [ -n "${SIGN_IDENTITY:-}" ]; then
+    echo "==> Signing with $SIGN_IDENTITY..."
+    codesign --force --options runtime --timestamp --sign "$SIGN_IDENTITY" \
+        "$CONTENTS/Frameworks/libghost_settings.dylib"
+    codesign --force --options runtime --timestamp --sign "$SIGN_IDENTITY" \
+        "$CONTENTS/MacOS/ghost"
+    codesign --force --options runtime --timestamp --sign "$SIGN_IDENTITY" \
+        "$APP_BUNDLE"
 fi
 
 echo "==> Done: $APP_BUNDLE"
