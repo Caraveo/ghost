@@ -58,41 +58,59 @@ pub fn render(ctx: &egui::Context, app: &mut App) {
     let c = app.colors();
     let pty_active = app.pty().is_some();
 
+    if pty_active {
+        handle_pty_input(ctx, app);
+    }
+
     // Tab bar (only when multiple tabs)
     if app.tabs.len() > 1 {
         render_tab_bar(ctx, app, &c);
     }
 
     // Bottom panel: status bar + input
-    egui::TopBottomPanel::bottom("bottom")
-        .exact_height(80.0)
-        .frame(egui::Frame::none().fill(c.bg).stroke(egui::Stroke::new(0.5_f32, c.border)).inner_margin(egui::Margin::same(10.0)))
-        .show(ctx, |ui| {
-            render_status_bar(ui, app, &c);
-            ui.separator();
-            render_input(ui, app, &c);
-        });
+    if !pty_active {
+        egui::TopBottomPanel::bottom("bottom")
+            .exact_height(80.0)
+            .frame(egui::Frame::none().fill(c.bg).stroke(egui::Stroke::new(0.5_f32, c.border)).inner_margin(egui::Margin::same(10.0)))
+            .show(ctx, |ui| {
+                render_status_bar(ui, app, &c);
+                ui.separator();
+                render_input(ui, app, &c);
+            });
+    }
 
-    // Main output area
+    // Main output area / editor
     let scroll = app.scroll_to_bottom();
+    let show_editor = app.show_editor && app.editor.is_some();
     let panel = egui::CentralPanel::default()
         .frame(egui::Frame::none().fill(c.bg).inner_margin(egui::Margin::same(16.0)))
         .show(ctx, |ui| {
-            if pty_active {
-                if let Some(pty) = app.pty().as_ref() {
-                    let content = pty.parser.screen().contents();
-                    egui::ScrollArea::vertical()
-                        .auto_shrink([false, false])
-                        .stick_to_bottom(true)
-                        .show(ui, |ui| {
-                            ui.spacing_mut().item_spacing.y = 0.0;
-                            for line in content.lines() {
-                                ui.label(egui::RichText::new(line)
-                                    .color(c.white)
-                                    .family(FontFamily::Monospace)
-                                    .size(13.0));
-                            }
-                        });
+            if show_editor {
+                render_editor(ui, app, &c);
+            } else if pty_active {
+                let font_id = FontId::new(13.0, FontFamily::Monospace);
+                let (cell_width, row_height) = ui.fonts(|fonts| {
+                    (fonts.glyph_width(&font_id, 'M'), fonts.row_height(&font_id))
+                });
+                let cols = (ui.available_width() / cell_width).floor().max(20.0) as u16;
+                let rows = (ui.available_height() / row_height).floor().max(5.0) as u16;
+
+                if let Some(pty) = app.pty_mut().as_mut() {
+                    pty.resize(cols, rows);
+                    let content = pty
+                        .parser
+                        .screen()
+                        .rows(0, cols)
+                        .collect::<Vec<_>>()
+                        .join("\n");
+                    ui.add(
+                        egui::Label::new(
+                            egui::RichText::new(content)
+                                .color(c.white)
+                                .font(font_id),
+                        )
+                        .extend(),
+                    );
                 }
             } else {
                 render_output(ui, app, scroll, &c);
@@ -120,6 +138,59 @@ pub fn render(ctx: &egui::Context, app: &mut App) {
 
     // Drag & drop files
     handle_dropped_files(ctx, app);
+}
+
+fn handle_pty_input(ctx: &egui::Context, app: &mut App) {
+    let events = ctx.input(|i| i.events.clone());
+    let Some(pty) = app.pty_mut().as_mut() else { return };
+    let application_cursor = pty.parser.screen().application_cursor();
+    let bracketed_paste = pty.parser.screen().bracketed_paste();
+
+    for event in events {
+        match event {
+            egui::Event::Text(text) => pty.send(text.as_bytes()),
+            egui::Event::Paste(text) => {
+                if bracketed_paste { pty.send(b"\x1b[200~"); }
+                pty.send(text.as_bytes());
+                if bracketed_paste { pty.send(b"\x1b[201~"); }
+            }
+            egui::Event::Key { key, pressed: true, modifiers, .. } if !modifiers.command => {
+                let bytes: Option<&[u8]> = if modifiers.ctrl {
+                    match key {
+                        Key::A => Some(b"\x01"), Key::B => Some(b"\x02"),
+                        Key::C => Some(b"\x03"), Key::D => Some(b"\x04"),
+                        Key::E => Some(b"\x05"), Key::F => Some(b"\x06"),
+                        Key::G => Some(b"\x07"), Key::H => Some(b"\x08"),
+                        Key::I => Some(b"\x09"), Key::J => Some(b"\x0a"),
+                        Key::K => Some(b"\x0b"), Key::L => Some(b"\x0c"),
+                        Key::M => Some(b"\x0d"), Key::N => Some(b"\x0e"),
+                        Key::O => Some(b"\x0f"), Key::P => Some(b"\x10"),
+                        Key::Q => Some(b"\x11"), Key::R => Some(b"\x12"),
+                        Key::S => Some(b"\x13"), Key::T => Some(b"\x14"),
+                        Key::U => Some(b"\x15"), Key::V => Some(b"\x16"),
+                        Key::W => Some(b"\x17"), Key::X => Some(b"\x18"),
+                        Key::Y => Some(b"\x19"), Key::Z => Some(b"\x1a"),
+                        _ => None,
+                    }
+                } else {
+                    match key {
+                        Key::Enter => Some(b"\r"), Key::Tab => Some(b"\t"),
+                        Key::Backspace => Some(b"\x7f"), Key::Escape => Some(b"\x1b"),
+                        Key::ArrowUp => Some(if application_cursor { b"\x1bOA" } else { b"\x1b[A" }),
+                        Key::ArrowDown => Some(if application_cursor { b"\x1bOB" } else { b"\x1b[B" }),
+                        Key::ArrowRight => Some(if application_cursor { b"\x1bOC" } else { b"\x1b[C" }),
+                        Key::ArrowLeft => Some(if application_cursor { b"\x1bOD" } else { b"\x1b[D" }),
+                        Key::Home => Some(b"\x1b[H"), Key::End => Some(b"\x1b[F"),
+                        Key::Delete => Some(b"\x1b[3~"), Key::Insert => Some(b"\x1b[2~"),
+                        Key::PageUp => Some(b"\x1b[5~"), Key::PageDown => Some(b"\x1b[6~"),
+                        _ => None,
+                    }
+                };
+                if let Some(bytes) = bytes { pty.send(bytes); }
+            }
+            _ => {}
+        }
+    }
 }
 
 fn handle_dropped_files(ctx: &egui::Context, app: &mut App) {
@@ -197,20 +268,36 @@ fn render_output(ui: &mut Ui, app: &App, _scroll: bool, c: &ThemeColors) {
 fn render_status_bar(ui: &mut Ui, app: &mut App, c: &ThemeColors) {
     ui.add_space(2.0);
     ui.horizontal(|ui| {
-        let st = if app.last_status == 0 { " OK ".to_string() } else { format!(" ERR({}) ", app.last_status) };
-        let sc = if app.last_status == 0 { c.green } else { c.red };
-        ui.label(egui::RichText::new(&st).color(sc).background_color(c.bg).size(11.0));
-        ui.separator();
-        let user = app.env.get("USER").or_else(|| app.env.get("USERNAME")).map(|s| s.as_str()).unwrap_or("user");
-        ui.label(egui::RichText::new(user).color(c.yellow).size(11.0));
-        ui.separator();
-        ui.label(egui::RichText::new(&app.display_cwd()).color(c.cyan).size(11.0));
-
-        if !app.git_branch.is_empty() {
+        if app.show_editor {
+            let path = app.editor.as_ref().map(|e| e.path.as_str()).unwrap_or("");
+            let modified = app.editor.as_ref().map(|e| e.modified()).unwrap_or(false);
+            let lang = app.editor.as_ref().map(|e| e.language()).unwrap_or("");
+            ui.label(egui::RichText::new(" EDIT ").color(c.cyan).size(11.0));
             ui.separator();
-            ui.label(egui::RichText::new(&app.git_branch).color(c.cyan).size(11.0));
-            if app.git_dirty {
-                ui.label(egui::RichText::new("*").color(c.yellow).strong().size(11.0));
+            ui.label(egui::RichText::new(path).color(c.white).size(11.0));
+            if modified {
+                ui.label(egui::RichText::new(" ●").color(c.yellow).size(11.0));
+            }
+            ui.separator();
+            ui.label(egui::RichText::new(lang).color(c.gray).size(11.0));
+            ui.separator();
+            ui.label(egui::RichText::new("Ctrl+S: save  Esc: close").color(c.gray).size(11.0));
+        } else {
+            let st = if app.last_status == 0 { " OK ".to_string() } else { format!(" ERR({}) ", app.last_status) };
+            let sc = if app.last_status == 0 { c.green } else { c.red };
+            ui.label(egui::RichText::new(&st).color(sc).background_color(c.bg).size(11.0));
+            ui.separator();
+            let user = app.env.get("USER").or_else(|| app.env.get("USERNAME")).map(|s| s.as_str()).unwrap_or("user");
+            ui.label(egui::RichText::new(user).color(c.yellow).size(11.0));
+            ui.separator();
+            ui.label(egui::RichText::new(&app.display_cwd()).color(c.cyan).size(11.0));
+
+            if !app.git_branch.is_empty() {
+                ui.separator();
+                ui.label(egui::RichText::new(&app.git_branch).color(c.cyan).size(11.0));
+                if app.git_dirty {
+                    ui.label(egui::RichText::new("*").color(c.yellow).strong().size(11.0));
+                }
             }
         }
 
@@ -222,10 +309,6 @@ fn render_status_bar(ui: &mut Ui, app: &mut App, c: &ThemeColors) {
             ui.label(egui::RichText::new(&app.status_message).color(c.green).size(11.0));
         }
         ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-            if ui.button(egui::RichText::new("⚙").color(c.cyan).size(13.0)).clicked() {
-                app.show_settings = !app.show_settings;
-            }
-            ui.separator();
             if ui.button(egui::RichText::new(app.theme.name()).color(c.cyan).size(11.0)).clicked() {
                 app.theme = app.theme.next();
             }
@@ -586,12 +669,12 @@ fn render_settings(ctx: &egui::Context, app: &mut App, c: &ThemeColors) {
             ui.add_space(4.0);
 
             ui.horizontal(|ui| {
-                ui.label(egui::RichText::new("PTY columns:").color(c.white).size(12.0));
+                ui.label(egui::RichText::new("Terminal columns:").color(c.white).size(12.0));
                 ui.add(egui::Slider::new(&mut app.pty_cols, 40..=240).text(""));
             });
             ui.add_space(2.0);
             ui.horizontal(|ui| {
-                ui.label(egui::RichText::new("PTY rows:").color(c.white).size(12.0));
+                ui.label(egui::RichText::new("Terminal rows:").color(c.white).size(12.0));
                 ui.add(egui::Slider::new(&mut app.pty_rows, 10..=80).text(""));
             });
             ui.add_space(6.0);
@@ -646,6 +729,94 @@ fn render_settings(ctx: &egui::Context, app: &mut App, c: &ThemeColors) {
             ui.label(egui::RichText::new("Ctrl+T: new tab | Ctrl+L: clear | Ctrl+H: help | Ctrl+D: quit").color(c.gray).size(11.0));
         });
     if !open { app.show_settings = false; }
+}
+
+fn render_editor(ui: &mut Ui, app: &mut App, c: &ThemeColors) {
+    let editor = app.editor.as_mut().unwrap();
+    let modified = editor.modified();
+    let path = editor.path.clone();
+    let ext = editor.extension().to_string();
+    let language = editor.language().to_string();
+    let line_count = editor.content.lines().count().max(1);
+
+    ui.horizontal_top(|ui| {
+        egui::ScrollArea::vertical()
+            .auto_shrink([false, false])
+            .max_width(f32::INFINITY)
+            .show(ui, |ui| {
+                ui.horizontal_top(|ui| {
+                    // Line numbers
+                    ui.vertical(|ui| {
+                        ui.spacing_mut().item_spacing.y = 0.0;
+                        for i in 1..=line_count {
+                            ui.label(egui::RichText::new(format!("{:>4} ", i))
+                                .color(c.gray)
+                                .font(FontId::new(13.0, FontFamily::Monospace))
+                                .size(13.0));
+                        }
+                    });
+
+                    ui.separator();
+
+                    // Editor with syntax highlighting
+                    let ctx = ui.ctx().clone();
+                    let output = egui::TextEdit::multiline(&mut editor.content)
+                        .font(FontId::new(13.0, FontFamily::Monospace))
+                        .desired_width(f32::MAX)
+                        .layouter(&mut move |_ui: &Ui, text: &str, _wrap: f32| {
+                            let job = crate::editor::highlight(text, &language);
+                            ctx.fonts(|f| f.layout_job(job))
+                        })
+                        .show(ui);
+
+                    // Handle Tab to insert tab character instead of changing focus
+                    if output.response.has_focus()
+                        && ui.input(|i| i.key_pressed(Key::Tab) && !i.modifiers.shift)
+                    {
+                        if let Some(cursor) = &output.cursor_range {
+                            let pos = cursor.primary.ccursor.index;
+                            editor.content.insert(pos, '\t');
+                            if let Some(mut state) =
+                                egui::widgets::text_edit::TextEditState::load(ui.ctx(), output.response.id)
+                            {
+                                let new_pos = egui::text::CCursor::new(pos + 1);
+                                state.cursor.set_char_range(Some(
+                                    egui::text_selection::CCursorRange::one(new_pos),
+                                ));
+                                state.store(ui.ctx(), output.response.id);
+                            }
+                        }
+                        ui.input_mut(|i| i.consume_key(egui::Modifiers::NONE, Key::Tab));
+                    }
+                });
+            });
+    });
+
+    // Ctrl+S to save, Esc to close
+    if ui.input(|i| i.key_pressed(Key::S) && i.modifiers.ctrl) {
+        if let Some(editor) = app.editor.as_ref() {
+            match std::fs::write(&editor.path, &editor.content) {
+                Ok(_) => {
+                    if let Some(editor) = app.editor.as_mut() {
+                        editor.original = editor.content.clone();
+                    }
+                    app.status_message = "*saved*".into();
+                }
+                Err(e) => {
+                    app.status_message = format!("save failed: {}", e);
+                }
+            }
+        }
+    }
+
+    if ui.input(|i| i.key_pressed(Key::Escape)) {
+        app.show_editor = false;
+        app.editor = None;
+        app.input_focused = true;
+    }
+
+    // Show file info in status bar area
+    let _ = (modified, path, ext);
 }
 
 fn now_str() -> String {

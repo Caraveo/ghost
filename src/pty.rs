@@ -39,6 +39,8 @@ impl PtySession {
                 cmd.env(k, v);
             }
         }
+        cmd.env("TERM", "xterm-256color");
+        cmd.env("COLORTERM", "truecolor");
 
         let child = pair.slave.spawn_command(cmd).map_err(|e| e.to_string())?;
         drop(pair.slave);

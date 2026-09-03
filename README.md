@@ -1,107 +1,128 @@
-# 👻 Ghost
+<p align="center">
+  <img src="ghost%20Exports/ghost-macOS-Dock-1024x1024.png" width="144" alt="Ghost app icon">
+</p>
 
-**A standalone desktop shell. Not a terminal. Not a TUI. A real native app.**
+<h1 align="center">Ghost</h1>
 
-[![Rust](https://img.shields.io/badge/Rust-1.70+-orange)](https://rust-lang.org)
-[![egui](https://img.shields.io/badge/egui-0.29-blue)](https://github.com/emilk/egui)
-[![License](https://img.shields.io/badge/license-MIT-green)]()
+<p align="center">
+  A native macOS command shell with built-in tools, responsive terminal emulation, and a focused desktop interface.
+</p>
 
----
+<p align="center">
+  <img alt="Rust" src="https://img.shields.io/badge/Rust-stable-orange?logo=rust">
+  <img alt="egui 0.29" src="https://img.shields.io/badge/egui-0.29-4f7cff">
+  <img alt="macOS" src="https://img.shields.io/badge/platform-macOS-black?logo=apple">
+</p>
 
-Ghost is a self-contained desktop application that lets you run system commands
-in a graphical interface. It does not run inside a terminal — it opens its own
-window with panels, tabs, themes, and visual controls.
+Ghost runs commands in its own macOS window instead of wrapping the Terminal app. Everyday operations can run through its built-in command engine, while interactive programs such as OpenCode and Grok run in dedicated terminal-emulation tabs.
 
-## ✨ Features
+## Highlights
 
-- **80+ built-in commands** — `ls`, `cp`, `mv`, `grep`, `find`, `tar`, `curl`, `calc`, `md5`, and more
-- **Natural language aliases** — `list`, `copy`, `move`, `remove`, `print`, `spill`, `name`
-- **Full PTY support** — interactive TUI apps like `opencode`, `grok`, `grid` run inline without freezing
-- **Tabbed interface** — `Ctrl+T` for new tabs, commands open in their own tab
-- **5 themes** — DarkCyan, Matrix, Solarized, Gruvbox, Light
-- **Safety checks** — destructive commands ask confirmation with file listings
-- **Git status** — branch and dirty flag in the status bar
-- **Drag & drop** — drop files from Finder into the input
-- **Clickable URLs** — https:// links in output are clickable
-- **Tab completion** — scans `$PATH` + builtins
-- **Command history** — Up/Down navigation
-- **Code editor** — `edit file.rs` opens a built-in editor with syntax highlighting
-- **Settings panel** — theme, font size, terminal size, environment variables, PATH viewer
-- **Right-click to copy** — output to clipboard with `*copied*` feedback
+- More than 80 built-in commands for files, text, archives, networking, hashing, and system information
+- Responsive terminal emulation that resizes with the window and supports full-screen terminal applications
+- Direct terminal input including arrow keys, control sequences, application-cursor mode, and bracketed paste
+- Tabbed sessions for the built-in shell and interactive processes
+- Command pipelines, redirection, conditionals, background jobs, and environment-variable expansion
+- Destructive-command confirmation with a preview of affected files
+- Built-in editor with syntax highlighting and save shortcuts
+- PATH-aware completion, command history, clickable links, drag and drop, and copyable output
+- Git branch and working-tree status in the interface
+- Dark Cyan, Matrix, Solarized, Gruvbox, and Light themes
+- Native macOS settings and menus
 
-## 🚀 Quick Start
+## Build and run
 
-```bash
-# Build
-cargo build --release
+Ghost currently targets macOS. You need the Rust toolchain and Apple command-line developer tools installed.
 
-# Create macOS .app bundle
+```sh
+git clone https://github.com/Caraveo/ghost.git
+cd ghost
 ./build_app.sh
-
-# Run
 open Ghost.app
 ```
 
-## ⌨️ Keybindings
+`build_app.sh` creates a release build, assembles `Ghost.app`, compiles the native settings component, and generates the application icon set.
 
-| Key | Action |
-|-----|--------|
-| `Enter` | Execute command |
-| `Tab` | Auto-complete |
-| `↑/↓` | History navigation |
-| `Ctrl+T` | New tab |
-| `Ctrl+L` | Clear output |
-| `Ctrl+C` | Interrupt / Clear input |
-| `Ctrl+D` | Quit |
-| `Ctrl+H` | Toggle help |
-| `Esc` | Cancel / Close editor / Quit |
-| `Ctrl+S` | Save file (in editor) |
+For a quick development check without assembling the app bundle:
 
-## 📦 Shell Syntax
-
-```
-cmd1 | cmd2          Pipe output
-cmd > file           Redirect to file
-cmd >> file          Append to file
-cmd < file           Read from file
-cmd1 && cmd2         Run if previous succeeds
-cmd1 || cmd2         Run if previous fails
-cmd &                Run in background
-$VAR / ${VAR}        Environment variable
+```sh
+cargo check
+cargo test
 ```
 
-## 🛠 Built With
+## Using Ghost
 
-- [Rust](https://rust-lang.org) — language
-- [egui](https://github.com/emilk/egui) — GUI framework
-- [portable-pty](https://crates.io/crates/portable-pty) — PTY for interactive commands
-- [vt100](https://crates.io/crates/vt100) — terminal screen parser
-- [syntect](https://crates.io/crates/syntect) — syntax highlighting for the code editor
+Enter commands in a Shell tab. Standard utilities and Ghost's built-ins render their output in the main pane. Interactive commands open in a terminal-emulation tab and receive the entire content area.
 
-## 📂 Project Structure
+Examples:
 
-```
-ghost/
-├── src/
-│   ├── main.rs        — app entry, command execution loop
-│   ├── app.rs         — app state, tabs, themes
-│   ├── gui.rs         — all UI rendering
-│   ├── pty.rs         — PTY session management
-│   ├── editor.rs      — code editor with syntax highlighting
-│   ├── executor.rs    — command pipeline execution
-│   ├── parser.rs      — shell syntax parser
-│   ├── builtins.rs    — built-in commands
-│   ├── safety.rs      — destructive command detection
-│   ├── completion.rs  — tab completion engine
-│   ├── fileops.rs     — file operations
-│   ├── network.rs     — network commands (seek, curl, ftp)
-│   ├── textproc.rs    — text processing (grep, sed, sort...)
-│   └── sysutils.rs    — system utilities
-├── Cargo.toml
-├── build_app.sh       — macOS .app bundle builder
-└── Ghost.app/         — built application
+```sh
+list
+findfile "*.rs"
+cat Cargo.toml | grep dependencies
+echo hello > greeting.txt
+git status && cargo check
+opencode
+grok
 ```
 
-## License
+Natural-language aliases include `list`, `copy`, `move`, `remove`, `print`, `spill`, and `name`.
 
-MIT
+### Shell syntax
+
+| Syntax | Meaning |
+| --- | --- |
+| `cmd1 \| cmd2` | Pipe output into another command |
+| `cmd > file` | Write output to a file |
+| `cmd >> file` | Append output to a file |
+| `cmd < file` | Read input from a file |
+| `cmd1 && cmd2` | Continue after success |
+| `cmd1 \|\| cmd2` | Continue after failure |
+| `cmd &` | Start a background job |
+| `$VAR`, `${VAR}` | Expand an environment variable |
+
+## Keyboard shortcuts
+
+### Shell and editor
+
+| Shortcut | Action |
+| --- | --- |
+| `Return` | Run the current command |
+| `Tab` | Complete a command or path |
+| `↑` / `↓` | Navigate command history |
+| `Control-T` | Open a new Shell tab |
+| `Control-L` | Clear output |
+| `Control-H` | Toggle help |
+| `Control-S` | Save the current editor document |
+| `Escape` | Cancel or close the active overlay |
+
+### Terminal emulation
+
+When an interactive program is active, Ghost sends text, navigation keys, control combinations, and paste events directly to that process. The terminal grid automatically recalculates its rows and columns whenever the window changes size.
+
+## Architecture
+
+Ghost is written in Rust with [egui](https://github.com/emilk/egui) and [eframe](https://github.com/emilk/egui/tree/master/crates/eframe). Its terminal-emulation layer uses [portable-pty](https://crates.io/crates/portable-pty), with [vt100](https://crates.io/crates/vt100) maintaining terminal screen state. The built-in editor uses [syntect](https://crates.io/crates/syntect) for syntax highlighting, and the native settings window and macOS menu bar are implemented in SwiftUI and AppKit.
+
+```text
+src/
+├── main.rs        Application entry point and execution loop
+├── app.rs         State, tabs, themes, history, and jobs
+├── gui.rs         Shell, terminal, editor, settings, and dialogs
+├── pty.rs         Terminal-emulation process lifecycle and resizing
+├── executor.rs    Command execution and pipelines
+├── parser.rs      Shell syntax parser
+├── builtins.rs    Built-in command dispatch
+├── fileops.rs     File-management commands
+├── textproc.rs    Text-processing commands
+├── network.rs     Network commands
+├── sysutils.rs    System utilities
+├── safety.rs      Destructive-operation checks
+├── completion.rs  Command and path completion
+├── editor.rs      Editor state and syntax highlighting
+└── settings.rs    Native settings integration
+```
+
+## Safety
+
+Ghost asks for confirmation before commands it recognizes as destructive. This is a guardrail, not a security boundary: commands and terminal applications run with the permissions of the current macOS user. Review commands before approving them.

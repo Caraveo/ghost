@@ -19,7 +19,7 @@ pub enum LineKind {
 }
 
 const SILENT_BUILTINS: &[&str] = &[
-    "cd", "pwd", "export", "clear", "jobs", "history", "exit", "quit", "help", "term", "x",
+    "cd", "pwd", "export", "clear", "jobs", "history", "exit", "quit", "help", "term", "x", "edit",
 ];
 
 pub fn is_silent_command(input: &str) -> bool {
@@ -182,6 +182,8 @@ pub struct App {
     pub git_dirty: bool,
     pub clipboard_text: String,
     pub show_settings: bool,
+    pub editor: Option<crate::editor::EditorState>,
+    pub show_editor: bool,
     pub font_size: f32,
     pub pty_cols: u16,
     pub pty_rows: u16,
@@ -230,6 +232,8 @@ impl App {
             git_dirty: false,
             clipboard_text: String::new(),
             show_settings: false,
+            editor: None,
+            show_editor: false,
             font_size: 13.0,
             pty_cols: 120,
             pty_rows: 40,

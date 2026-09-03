@@ -9,17 +9,36 @@ echo "==> Building ghost (release)..."
 cargo build --release --manifest-path "$PROJECT_DIR/Cargo.toml"
 
 echo "==> Assembling .app bundle..."
-mkdir -p "$CONTENTS/MacOS" "$CONTENTS/Resources"
+mkdir -p "$CONTENTS/MacOS" "$CONTENTS/Resources" "$CONTENTS/Frameworks"
 
 # Copy binary
 cp "$PROJECT_DIR/target/release/ghost" "$CONTENTS/MacOS/ghost"
 chmod +x "$CONTENTS/MacOS/ghost"
 
+# Compile Swift settings panel
+echo "==> Compiling Swift settings panel..."
+SWIFT_SRC="$PROJECT_DIR/settings/Settings.swift"
+SWIFT_OUT="$CONTENTS/Frameworks/libghost_settings.dylib"
+ARCH=$(uname -m)
+if [ "$ARCH" = "arm64" ]; then
+    SWIFT_TARGET="arm64-apple-macos13.0"
+else
+    SWIFT_TARGET="x86_64-apple-macos13.0"
+fi
+swiftc -emit-library "$SWIFT_SRC" \
+    -o "$SWIFT_OUT" \
+    -framework SwiftUI -framework Cocoa \
+    -target "$SWIFT_TARGET" \
+    -O 2>&1 || echo "    Swift compilation failed, native settings disabled"
+if [ -f "$SWIFT_OUT" ]; then
+    echo "    Swift settings panel compiled ($ARCH)"
+fi
+
 # Copy Info.plist
 cp "$PROJECT_DIR/Info.plist" "$CONTENTS/Info.plist"
 
 # Generate .icns from source PNG if available
-ICON_SRC="$PROJECT_DIR/ghost Exports/ghost-iOS-Default-1024x1024@1x.png"
+ICON_SRC="$PROJECT_DIR/ghost Exports/ghost-macOS-Dock-1024x1024.png"
 if [ ! -f "$ICON_SRC" ]; then
     ICON_SRC="$PROJECT_DIR/ghost.icon/Assets/ghost.png"
 fi

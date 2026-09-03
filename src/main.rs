@@ -1,6 +1,7 @@
 mod app;
 mod builtins;
 mod completion;
+mod editor;
 mod executor;
 mod fileops;
 mod gui;
@@ -8,6 +9,7 @@ mod network;
 mod parser;
 mod pty;
 mod safety;
+mod settings;
 mod sysutils;
 mod textproc;
 
@@ -31,13 +33,14 @@ pub const BUILTINS: &[&str] = &[
     "list", "copy", "move", "remove", "delete", "del",
     "makedir", "newdir", "createdir", "removedir",
     "link", "findfile", "treeview", "touchfile",
-    "print", "where", "rename", "bye", "spill",
+    "print", "where", "rename", "bye", "spill", "edit",
 ];
 
 struct GhostApp {
     app: App,
     executor: Executor,
     git_check_timer: Instant,
+    settings_watcher: settings::SettingsWatcher,
 }
 
 impl eframe::App for GhostApp {
@@ -61,6 +64,22 @@ impl eframe::App for GhostApp {
 
         gui::setup(ctx, self.app.theme);
         gui::render(ctx, &mut self.app);
+
+        // Check for native settings changes
+        self.settings_watcher.check_and_apply(&mut self.app);
+
+        // Poll native menu actions: 1=new tab, 2=close tab, 3=clear, 4=toggle help
+        match settings::consume_menu_action() {
+            1 => self.app.new_shell_tab(),
+            2 => {
+                if self.app.tabs.len() > 1 {
+                    self.app.close_tab(self.app.active_tab);
+                }
+            }
+            3 => self.app.clear_results(),
+            4 => self.app.show_help = !self.app.show_help,
+            _ => {}
+        }
 
         // Process pending command
         if let Some(cmd) = self.app.pending_execution.take() {
@@ -150,6 +169,14 @@ impl GhostApp {
             return;
         }
 
+        if result.status == 1001 {
+            if let Some((path, content)) = self.executor.pending_editor.take() {
+                self.app.editor = Some(crate::editor::EditorState::new(path, content));
+                self.app.show_editor = true;
+            }
+            return;
+        }
+
         if !result.stdout.is_empty() {
             self.app.add_output(result.stdout.trim_end(), LineKind::Stdout);
         }
@@ -229,6 +256,16 @@ impl GhostApp {
                     self.app.new_pty_tab(cmd, pty);
                 }
             }
+            "edit" => {
+                let program = match parser::parse(input) { Ok(p) => p, Err(_) => return };
+                self.executor.execute(&program, &|name, args, exec| {
+                    builtins::handle_builtin(name, args, exec)
+                });
+                if let Some((path, content)) = self.executor.pending_editor.take() {
+                    self.app.editor = Some(crate::editor::EditorState::new(path, content));
+                    self.app.show_editor = true;
+                }
+            }
             _ => {}
         }
 
@@ -248,26 +285,39 @@ fn main() -> Result<(), eframe::Error> {
         ..Default::default()
     };
     eframe::run_native("Ghost Shell", options, Box::new(|_cc| {
+        setup_terminal_font(&_cc.egui_ctx);
+        settings::setup_menu();
         Ok(Box::new(GhostApp {
             app: App::new(),
             executor: Executor::new(),
             git_check_timer: Instant::now(),
+            settings_watcher: settings::SettingsWatcher::new(),
         }))
     }))
 }
 
+fn setup_terminal_font(ctx: &egui::Context) {
+    let mut fonts = egui::FontDefinitions::default();
+    fonts.font_data.insert(
+        "SF Mono".to_owned(),
+        egui::FontData::from_static(include_bytes!("/System/Library/Fonts/SFNSMono.ttf")),
+    );
+    fonts.font_data.insert(
+        "Apple Braille".to_owned(),
+        egui::FontData::from_static(include_bytes!("/System/Library/Fonts/Apple Braille.ttf")),
+    );
+    let monospace = fonts
+        .families
+        .get_mut(&egui::FontFamily::Monospace)
+        .expect("default monospace family must exist");
+    monospace.insert(0, "Apple Braille".to_owned());
+    monospace.insert(0, "SF Mono".to_owned());
+    ctx.set_fonts(fonts);
+}
+
 fn load_icon() -> egui::IconData {
-    let size = 32usize;
-    let mut rgba = Vec::with_capacity(size * size * 4);
-    for y in 0..size {
-        for x in 0..size {
-            let dx = (x as f32 - size as f32 / 2.0) / (size as f32 / 2.0);
-            let dy = (y as f32 - size as f32 / 2.0) / (size as f32 / 2.0);
-            let dist = (dx * dx + dy * dy).sqrt();
-            if dist < 0.85 { rgba.extend_from_slice(&[0, 200, 220, 255]); }
-            else if dist < 0.92 { rgba.extend_from_slice(&[0, 100, 120, 255]); }
-            else { rgba.extend_from_slice(&[0, 0, 0, 0]); }
-        }
-    }
-    egui::IconData { rgba, width: size as u32, height: size as u32 }
+    eframe::icon_data::from_png_bytes(include_bytes!(
+        "../ghost Exports/ghost-macOS-Dock-1024x1024.png"
+    ))
+    .expect("embedded Ghost app icon must be a valid PNG")
 }

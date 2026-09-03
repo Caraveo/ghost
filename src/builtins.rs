@@ -38,6 +38,7 @@ pub fn handle_builtin(name: &str, args: &[String], executor: &mut Executor) -> O
         "term" => Some(builtin_term(args, executor)),
         "name" => Some(builtin_name(args, executor)),
         "spill" => Some(builtin_spill(args, executor)),
+        "edit" => Some(builtin_edit(args, executor)),
         _ => crate::network::handle_network_builtin(resolved, args)
             .or_else(|| crate::textproc::handle(resolved, args))
             .or_else(|| crate::sysutils::handle(resolved, args))
@@ -102,9 +103,10 @@ fn builtin_hello() -> CommandResult {
   4. seek rust web framework             Search the web via SEEK
   5. tar -czf out.tar.gz src/            Create a gzip archive
   6. calc 2+2*8                          Evaluate a math expression
-  7. rm -rf testdir                      (triggers safety dialog)
-  8. help                                Show keybindings
-  9. echo $HOME                          Environment variable expansion
+  7. edit Cargo.toml                     Open built-in editor (creates if missing)
+  8. rm -rf testdir                      (triggers safety dialog)
+  9. help                                Show keybindings
+  10. echo $HOME                         Environment variable expansion
 
 ============================================================================
   Type any command below and press Enter to begin.
@@ -278,9 +280,13 @@ Builtins:
   export VAR=val  Set environment variable
   jobs            List background jobs
   launch <cmd>    Open interactive TUI app in a new Terminal window
-  term <cmd>      Run interactive TUI app embedded in Ghost (full PTY)
+  term <cmd>      Run an interactive app with Ghost terminal emulation
+  edit <file>     Open file in built-in editor (creates if missing)
+  spill <file>    Print file contents (cat)
+  name <file>     Rename file keeping its extension
   clear           Clear the output screen
   help            Show this help
+  hello           Show welcome message with feature list
   exit [code]     Exit Ghost Shell
 
 Shell Features:
@@ -292,12 +298,14 @@ Shell Features:
   Quotes:          "text", 'text'
 
 Keybindings:
-  Tab              Auto-complete
+  Tab              Auto-complete (in shell) / Insert tab (in editor)
   Up/Down          History navigation
+  Ctrl+T           New tab
   Ctrl+L           Clear output
   Ctrl+C           Clear input line
   Ctrl+D           Quit
-  Esc              Cancel / Quit
+  Ctrl+S           Save file (in editor)
+  Esc              Close editor / Cancel / Quit
   Page Up/Down     Scroll output
 "#;
     CommandResult::ok(help)
@@ -425,4 +433,30 @@ fn builtin_spill(args: &[String], executor: &Executor) -> CommandResult {
         }
         Err(e) => CommandResult::err(&format!("spill: {}: {}\n", filename, e)),
     }
+}
+
+fn builtin_edit(args: &[String], executor: &mut Executor) -> CommandResult {
+    if args.is_empty() {
+        return CommandResult::err("edit: usage: edit <file>\n");
+    }
+
+    let path = expand_env(&args[0], &executor.env);
+
+    let content = match std::fs::read_to_string(&path) {
+        Ok(c) => c,
+        Err(_) => {
+            if let Err(e) = std::fs::write(&path, "") {
+                return CommandResult::err(&format!("edit: cannot create {}: {}\n", path, e));
+            }
+            if let Ok(user) = std::env::var("USER") {
+                let _ = std::process::Command::new("chown")
+                    .args([&user, &path])
+                    .output();
+            }
+            String::new()
+        }
+    };
+
+    executor.pending_editor = Some((path, content));
+    CommandResult::code(1001, "", "")
 }

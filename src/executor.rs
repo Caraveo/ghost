@@ -85,7 +85,7 @@ const ALL_BUILTINS: &[&str] = &[
     "list", "copy", "move", "remove", "delete", "del",
     "makedir", "newdir", "createdir", "removedir",
     "link", "findfile", "treeview", "touchfile",
-    "print", "where", "rename", "bye", "spill",
+    "print", "where", "rename", "bye", "spill", "edit",
 ];
 
 fn levenshtein(a: &str, b: &str) -> usize {
@@ -169,6 +169,7 @@ pub struct Executor {
     pub background_jobs: Vec<(u32, Child)>,
     pub background_cmds: Vec<String>,
     pub pending_pty: Option<crate::pty::PtySession>,
+    pub pending_editor: Option<(String, String)>,
 }
 
 impl Executor {
@@ -190,6 +191,7 @@ impl Executor {
             background_jobs: Vec::new(),
             background_cmds: Vec::new(),
             pending_pty: None,
+            pending_editor: None,
         }
     }
 
