@@ -68,7 +68,7 @@ pub fn render(ctx: &egui::Context, app: &mut App) {
         egui::TopBottomPanel::bottom("bottom")
             .exact_height(54.0)
             .frame(egui::Frame::none()
-                .fill(c.panel)
+                .fill(Color32::WHITE)
                 .stroke(egui::Stroke::new(0.75_f32, c.border))
                 .inner_margin(egui::Margin::symmetric(16.0, 10.0)))
             .show(ctx, |ui| {
