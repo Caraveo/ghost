@@ -24,12 +24,11 @@ Ghost runs commands in its own macOS window instead of wrapping the Terminal app
 
 Download the latest signed universal macOS build from [Releases](https://github.com/Caraveo/ghost/releases/latest), unzip it, and drag **Ghost.app** into **Applications**.
 
-Or install it from Terminal. Because this repository is private, authenticate
-the GitHub CLI first with `gh auth login`:
+Or install it from Terminal:
 
 ```sh
-gh release download --repo Caraveo/ghost --pattern 'Ghost-macOS-universal.zip' --clobber
-ditto -x -k Ghost-macOS-universal.zip .
+curl -fL https://github.com/Caraveo/ghost/releases/latest/download/Ghost-macOS-universal.zip -o Ghost.zip
+ditto -x -k Ghost.zip .
 open Ghost.app
 ```
 

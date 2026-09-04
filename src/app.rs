@@ -202,15 +202,11 @@ impl App {
         env.insert("?".into(), "0".into());
         let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("/"));
 
-        let mut results = Vec::new();
-        results.push(OutputLine { text: "Ghost Shell v0.7.0".into(), kind: LineKind::Info });
-        results.push(OutputLine { text: "Type 'help' for keybindings, 'hello' for features.".into(), kind: LineKind::Info });
-        results.push(OutputLine { text: "Drag & drop files into the input to insert paths.".into(), kind: LineKind::Info });
-        results.push(OutputLine { text: String::new(), kind: LineKind::Normal });
+        let results = Vec::new();
 
         App {
             input: String::new(),
-            tabs: vec![Tab { name: "Shell".into(), results, pty: None, scroll_to_bottom: true }],
+            tabs: vec![Tab { name: "shell".into(), results, pty: None, scroll_to_bottom: true }],
             active_tab: 0,
             history: Vec::new(),
             env,
@@ -341,9 +337,26 @@ impl App {
         if i < self.tabs.len() { self.active_tab = i; self.input_focused = true; }
     }
 
+    pub fn name_active_tab_for_command(&mut self, command: &str) {
+        let Some(tab) = self.tabs.get_mut(self.active_tab) else { return };
+        if tab.name != "shell" || !tab.results.is_empty() { return; }
+
+        let name = command
+            .split_whitespace()
+            .next()
+            .unwrap_or("shell")
+            .trim_start_matches("./")
+            .rsplit('/')
+            .next()
+            .unwrap_or("shell");
+        if !name.is_empty() {
+            tab.name = name.chars().take(18).collect();
+        }
+    }
+
     pub fn new_shell_tab(&mut self) {
         self.tabs.push(Tab {
-            name: "Shell".into(),
+            name: "shell".into(),
             results: vec![],
             pty: None,
             scroll_to_bottom: true,

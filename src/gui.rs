@@ -1,15 +1,15 @@
-use egui::{Color32, FontFamily, FontId, Key, Layout, Sense, Ui, Align};
+use egui::{Color32, FontFamily, FontId, Key, Layout, Sense, Ui, Align, CursorIcon};
 
 use crate::app::{App, LineKind, Theme, ThemeColors};
 
 pub fn setup(ctx: &egui::Context, theme: Theme) {
     let mut style: egui::Style = (*ctx.style()).clone();
-    style.text_styles.insert(egui::TextStyle::Small, FontId::new(11.0, FontFamily::Monospace));
-    style.text_styles.insert(egui::TextStyle::Body, FontId::new(13.0, FontFamily::Monospace));
-    style.text_styles.insert(egui::TextStyle::Button, FontId::new(13.0, FontFamily::Monospace));
-    style.spacing.item_spacing = egui::vec2(6.0, 3.0);
-    style.spacing.window_margin = egui::Margin::same(6.0);
-    style.spacing.button_padding = egui::vec2(6.0, 2.0);
+    style.text_styles.insert(egui::TextStyle::Small, FontId::new(12.0, FontFamily::Monospace));
+    style.text_styles.insert(egui::TextStyle::Body, FontId::new(15.0, FontFamily::Monospace));
+    style.text_styles.insert(egui::TextStyle::Button, FontId::new(15.0, FontFamily::Monospace));
+    style.spacing.item_spacing = egui::vec2(8.0, 4.0);
+    style.spacing.window_margin = egui::Margin::same(8.0);
+    style.spacing.button_padding = egui::vec2(12.0, 5.0);
     ctx.set_style(style);
 
     let c = ThemeColors::from(theme);
@@ -21,13 +21,13 @@ pub fn setup(ctx: &egui::Context, theme: Theme) {
     visuals.faint_bg_color = c.bg;
     visuals.code_bg_color = c.panel;
 
-    // Liquid glass rounding — no rounding, keep sharp
-    visuals.window_rounding = egui::Rounding::ZERO;
-    visuals.widgets.noninteractive.rounding = egui::Rounding::ZERO;
-    visuals.widgets.inactive.rounding = egui::Rounding::ZERO;
-    visuals.widgets.hovered.rounding = egui::Rounding::ZERO;
-    visuals.widgets.active.rounding = egui::Rounding::ZERO;
-    visuals.widgets.open.rounding = egui::Rounding::ZERO;
+    let control_rounding = egui::Rounding::same(5.0);
+    visuals.window_rounding = egui::Rounding::same(10.0);
+    visuals.widgets.noninteractive.rounding = control_rounding;
+    visuals.widgets.inactive.rounding = control_rounding;
+    visuals.widgets.hovered.rounding = control_rounding;
+    visuals.widgets.active.rounding = control_rounding;
+    visuals.widgets.open.rounding = control_rounding;
 
     let border_stroke = egui::Stroke::new(0.5_f32, c.border);
     let thin_stroke = egui::Stroke::new(0.3_f32, c.border);
@@ -62,19 +62,16 @@ pub fn render(ctx: &egui::Context, app: &mut App) {
         handle_pty_input(ctx, app);
     }
 
-    // Tab bar (only when multiple tabs)
-    if app.tabs.len() > 1 {
-        render_tab_bar(ctx, app, &c);
-    }
+    render_tab_bar(ctx, app, &c);
 
-    // Bottom panel: status bar + input
     if !pty_active {
         egui::TopBottomPanel::bottom("bottom")
-            .exact_height(80.0)
-            .frame(egui::Frame::none().fill(c.bg).stroke(egui::Stroke::new(0.5_f32, c.border)).inner_margin(egui::Margin::same(10.0)))
+            .exact_height(54.0)
+            .frame(egui::Frame::none()
+                .fill(c.panel)
+                .stroke(egui::Stroke::new(0.75_f32, c.border))
+                .inner_margin(egui::Margin::symmetric(16.0, 10.0)))
             .show(ctx, |ui| {
-                render_status_bar(ui, app, &c);
-                ui.separator();
                 render_input(ui, app, &c);
             });
     }
@@ -83,12 +80,12 @@ pub fn render(ctx: &egui::Context, app: &mut App) {
     let scroll = app.scroll_to_bottom();
     let show_editor = app.show_editor && app.editor.is_some();
     let panel = egui::CentralPanel::default()
-        .frame(egui::Frame::none().fill(c.bg).inner_margin(egui::Margin::same(16.0)))
+        .frame(egui::Frame::none().fill(c.bg).inner_margin(egui::Margin::symmetric(18.0, 12.0)))
         .show(ctx, |ui| {
             if show_editor {
                 render_editor(ui, app, &c);
             } else if pty_active {
-                let font_id = FontId::new(13.0, FontFamily::Monospace);
+                let font_id = FontId::new(app.font_size, FontFamily::Monospace);
                 let (cell_width, row_height) = ui.fonts(|fonts| {
                     (fonts.glyph_width(&font_id, 'M'), fonts.row_height(&font_id))
                 });
@@ -279,49 +276,92 @@ fn handle_dropped_files(ctx: &egui::Context, app: &mut App) {
 }
 
 fn render_tab_bar(ctx: &egui::Context, app: &mut App, c: &ThemeColors) {
-    let tab_count = app.tabs.len();
     let active = app.active_tab;
     let mut switch_to = None;
-    let mut close_idx = None;
+    let mut close_active = false;
     let mut add_new = false;
 
     egui::TopBottomPanel::top("tabs")
-        .exact_height(34.0)
-        .frame(egui::Frame::none().fill(c.panel).stroke(egui::Stroke::new(0.5_f32, c.border)).inner_margin(egui::Margin::symmetric(10.0, 5.0)))
+        .exact_height(46.0)
+        .frame(egui::Frame::none()
+            .fill(c.panel)
+            .stroke(egui::Stroke::new(0.75_f32, c.border))
+            .inner_margin(egui::Margin::symmetric(12.0, 7.0)))
         .show(ctx, |ui| {
             ui.horizontal(|ui| {
+                window_controls(ui, ctx);
+                ui.add_space(8.0);
+
                 for (i, tab) in app.tabs.iter().enumerate() {
                     let is_active = i == active;
                     let running = tab.pty.is_some();
                     let name = &tab.name;
                     let label = if running { format!("● {}", name) } else { name.clone() };
 
-                    let bg = if is_active { c.active } else { Color32::TRANSPARENT };
-                    let fg = if is_active { c.cyan } else if running { c.green } else { c.gray };
-                    let stroke = if is_active { egui::Stroke::new(1.0_f32, c.cyan) } else { egui::Stroke::new(0.5_f32, c.border) };
+                    let bg = if is_active { c.bg } else { Color32::TRANSPARENT };
+                    let fg = if running || !is_active { c.green } else { c.white };
+                    let stroke = egui::Stroke::new(if is_active { 1.0_f32 } else { 0.6_f32 }, c.border);
 
-                    let btn = egui::Button::new(egui::RichText::new(&label).color(fg).size(12.0))
+                    let btn = egui::Button::new(egui::RichText::new(&label).color(fg).size(14.0))
                         .fill(bg)
                         .stroke(stroke)
-                        .min_size(egui::vec2(60.0, 24.0));
+                        .rounding(5.0)
+                        .min_size(egui::vec2(92.0, 30.0));
                     let resp = ui.add(btn);
                     if resp.clicked() { switch_to = Some(i); }
-
-                    ui.add_space(2.0);
                 }
 
-                if ui.add(egui::Button::new(egui::RichText::new("+").color(c.cyan).size(14.0))
+                if ui.add(egui::Button::new(egui::RichText::new("+").color(c.white).strong().size(20.0))
                     .fill(Color32::TRANSPARENT).frame(false)).clicked() {
                     add_new = true;
                 }
+
+                ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                    if ui.add(
+                        egui::Button::new(egui::RichText::new("×").color(c.white).size(22.0))
+                            .fill(Color32::TRANSPARENT)
+                            .frame(false)
+                    ).on_hover_text("Close active tab (⌘W)").clicked() {
+                        if app.tabs.len() > 1 { close_active = true; }
+                        else { ctx.send_viewport_cmd(egui::ViewportCommand::Close); }
+                    }
+                });
             });
+
+            let drag_rect = ui.max_rect();
+            let drag = ui.interact(drag_rect, ui.id().with("window_drag"), Sense::drag());
+            if drag.drag_started() {
+                ctx.send_viewport_cmd(egui::ViewportCommand::StartDrag);
+            }
         });
 
     if let Some(i) = switch_to { app.switch_tab(i); }
-    if let Some(i) = close_idx { app.close_tab(i); }
+    if close_active { app.close_tab(active); }
     if add_new { app.new_shell_tab(); }
+}
 
-    let _ = tab_count;
+fn window_controls(ui: &mut Ui, ctx: &egui::Context) {
+    let controls = [
+        (Color32::from_rgb(255, 95, 87), "Close"),
+        (Color32::from_rgb(255, 189, 46), "Minimize"),
+        (Color32::from_rgb(40, 200, 64), "Zoom"),
+    ];
+
+    for (index, (color, label)) in controls.into_iter().enumerate() {
+        let (rect, response) = ui.allocate_exact_size(egui::vec2(14.0, 24.0), Sense::click());
+        ui.painter().circle_filled(rect.center(), 6.0, color);
+        let response = response.on_hover_cursor(CursorIcon::PointingHand).on_hover_text(label);
+        if response.clicked() {
+            match index {
+                0 => ctx.send_viewport_cmd(egui::ViewportCommand::Close),
+                1 => ctx.send_viewport_cmd(egui::ViewportCommand::Minimized(true)),
+                _ => {
+                    let maximized = ctx.input(|i| i.viewport().maximized.unwrap_or(false));
+                    ctx.send_viewport_cmd(egui::ViewportCommand::Maximized(!maximized));
+                }
+            }
+        }
+    }
 }
 
 fn render_output(ui: &mut Ui, app: &App, _scroll: bool, c: &ThemeColors) {
@@ -329,6 +369,7 @@ fn render_output(ui: &mut Ui, app: &App, _scroll: bool, c: &ThemeColors) {
         .auto_shrink([false, false])
         .stick_to_bottom(true)
         .show(ui, |ui| {
+            ui.style_mut().spacing.item_spacing.y = 1.0;
             for line in app.results() {
                 let color = line_color(&line.kind, c);
                 if line.text.is_empty() { ui.add_space(4.0); }
@@ -393,22 +434,21 @@ fn render_status_bar(ui: &mut Ui, app: &mut App, c: &ThemeColors) {
 
 fn render_input(ui: &mut Ui, app: &mut App, c: &ThemeColors) {
     let pty_active = app.pty().is_some();
-    ui.add_space(4.0);
     ui.vertical(|ui| {
         ui.horizontal(|ui| {
             if pty_active {
                 let cmd = app.pty().as_ref().map(|p| p.command.as_str()).unwrap_or("");
                 ui.label(egui::RichText::new(format!("{} ▶", cmd)).color(c.yellow).strong().size(13.0));
             } else {
-                let prompt = app.prompt();
-                ui.label(egui::RichText::new(&prompt).color(c.green).strong().size(13.0));
+                ui.label(egui::RichText::new("→").color(c.white).strong().size(22.0));
             }
 
             let resp = ui.add(
                 egui::TextEdit::singleline(&mut app.input)
-                    .font(FontId::new(13.0, FontFamily::Monospace))
+                    .font(FontId::new(app.font_size, FontFamily::Monospace))
+                    .text_color(c.white)
                     .desired_width(f32::MAX)
-                    .frame(true)
+                    .frame(false)
                     .lock_focus(true)
             );
 
@@ -813,7 +853,7 @@ fn render_settings(ctx: &egui::Context, app: &mut App, c: &ThemeColors) {
             // ── About ──
             ui.separator();
             ui.add_space(4.0);
-            ui.label(egui::RichText::new("Ghost Shell v0.7.0").color(c.cyan).size(12.0));
+            ui.label(egui::RichText::new("Ghost Shell v0.7.1").color(c.cyan).size(12.0));
             ui.label(egui::RichText::new("Standalone GUI shell built in Rust with egui").color(c.gray).size(11.0));
             ui.label(egui::RichText::new("Ctrl+T: new tab | Ctrl+L: clear | Ctrl+H: help | Ctrl+D: quit").color(c.gray).size(11.0));
         });

@@ -132,7 +132,7 @@ struct AboutTab: View {
             Text("Ghost Shell")
                 .font(.title)
                 .fontWeight(.bold)
-            Text("v0.7.0")
+            Text("v0.7.1")
                 .foregroundColor(.secondary)
             Text("Native macOS shell with responsive terminal emulation")
                 .foregroundColor(.secondary)
