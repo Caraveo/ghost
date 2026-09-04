@@ -177,6 +177,24 @@ pub fn setup_menu() {
     }
 }
 
+pub fn configure_main_window() {
+    let dylib = match find_dylib() {
+        Some(d) => d,
+        None => return,
+    };
+
+    unsafe {
+        let path = std::ffi::CString::new(dylib.to_string_lossy().as_ref()).unwrap();
+        let lib = dlopen(path.as_ptr(), RTLD_NOW);
+        if lib.is_null() { return; }
+        let sym = std::ffi::CString::new("ghost_configure_main_window").unwrap();
+        let func = dlsym(lib, sym.as_ptr());
+        if func.is_null() { return; }
+        let configure: extern "C" fn() = std::mem::transmute(func);
+        configure();
+    }
+}
+
 /// Returns menu action: 0=none, 1=new tab, 2=close tab, 3=clear, 4=toggle help
 pub fn consume_menu_action() -> i32 {
     let dylib = match find_dylib() {

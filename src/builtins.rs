@@ -49,7 +49,7 @@ pub fn handle_builtin(name: &str, args: &[String], executor: &mut Executor) -> O
 fn builtin_hello() -> CommandResult {
     let msg = r#"
 ============================================================================
-  GHOST SHELL v0.7.1
+  GHOST SHELL v0.8.0
   A standalone GUI shell — not a terminal emulator, not a TUI.
   A real native desktop application built in Rust with egui.
 ============================================================================

@@ -1,12 +1,12 @@
-use egui::{Color32, FontFamily, FontId, Key, Layout, Sense, Ui, Align, CursorIcon};
+use egui::{Color32, FontFamily, FontId, Key, Layout, Sense, Ui, Align};
 
 use crate::app::{App, LineKind, Theme, ThemeColors};
 
 pub fn setup(ctx: &egui::Context, theme: Theme) {
     let mut style: egui::Style = (*ctx.style()).clone();
     style.text_styles.insert(egui::TextStyle::Small, FontId::new(12.0, FontFamily::Monospace));
-    style.text_styles.insert(egui::TextStyle::Body, FontId::new(15.0, FontFamily::Monospace));
-    style.text_styles.insert(egui::TextStyle::Button, FontId::new(15.0, FontFamily::Monospace));
+    style.text_styles.insert(egui::TextStyle::Body, FontId::new(14.0, FontFamily::Monospace));
+    style.text_styles.insert(egui::TextStyle::Button, FontId::new(14.0, FontFamily::Monospace));
     style.spacing.item_spacing = egui::vec2(8.0, 4.0);
     style.spacing.window_margin = egui::Margin::same(8.0);
     style.spacing.button_padding = egui::vec2(12.0, 5.0);
@@ -85,7 +85,7 @@ pub fn render(ctx: &egui::Context, app: &mut App) {
             if show_editor {
                 render_editor(ui, app, &c);
             } else if pty_active {
-                let font_id = FontId::new(app.font_size, FontFamily::Monospace);
+                let font_id = FontId::new(13.0, FontFamily::Monospace);
                 let (cell_width, row_height) = ui.fonts(|fonts| {
                     (fonts.glyph_width(&font_id, 'M'), fonts.row_height(&font_id))
                 });
@@ -282,15 +282,20 @@ fn render_tab_bar(ctx: &egui::Context, app: &mut App, c: &ThemeColors) {
     let mut add_new = false;
 
     egui::TopBottomPanel::top("tabs")
-        .exact_height(46.0)
+        .exact_height(52.0)
         .frame(egui::Frame::none()
-            .fill(c.panel)
+            .fill(c.bg)
             .stroke(egui::Stroke::new(0.75_f32, c.border))
-            .inner_margin(egui::Margin::symmetric(12.0, 7.0)))
+            .inner_margin(egui::Margin {
+                left: 14.0,
+                right: 12.0,
+                top: 9.0,
+                bottom: 9.0,
+            }))
         .show(ctx, |ui| {
             ui.horizontal(|ui| {
-                window_controls(ui, ctx);
-                ui.add_space(8.0);
+                render_window_controls(ui, ctx);
+                ui.add_space(18.0);
 
                 for (i, tab) in app.tabs.iter().enumerate() {
                     let is_active = i == active;
@@ -298,7 +303,7 @@ fn render_tab_bar(ctx: &egui::Context, app: &mut App, c: &ThemeColors) {
                     let name = &tab.name;
                     let label = if running { format!("● {}", name) } else { name.clone() };
 
-                    let bg = if is_active { c.bg } else { Color32::TRANSPARENT };
+                    let bg = c.bg;
                     let fg = if running || !is_active { c.green } else { c.white };
                     let stroke = egui::Stroke::new(if is_active { 1.0_f32 } else { 0.6_f32 }, c.border);
 
@@ -306,7 +311,7 @@ fn render_tab_bar(ctx: &egui::Context, app: &mut App, c: &ThemeColors) {
                         .fill(bg)
                         .stroke(stroke)
                         .rounding(5.0)
-                        .min_size(egui::vec2(92.0, 30.0));
+                        .min_size(egui::vec2(88.0, 34.0));
                     let resp = ui.add(btn);
                     if resp.clicked() { switch_to = Some(i); }
                 }
@@ -328,11 +333,6 @@ fn render_tab_bar(ctx: &egui::Context, app: &mut App, c: &ThemeColors) {
                 });
             });
 
-            let drag_rect = ui.max_rect();
-            let drag = ui.interact(drag_rect, ui.id().with("window_drag"), Sense::drag());
-            if drag.drag_started() {
-                ctx.send_viewport_cmd(egui::ViewportCommand::StartDrag);
-            }
         });
 
     if let Some(i) = switch_to { app.switch_tab(i); }
@@ -340,7 +340,7 @@ fn render_tab_bar(ctx: &egui::Context, app: &mut App, c: &ThemeColors) {
     if add_new { app.new_shell_tab(); }
 }
 
-fn window_controls(ui: &mut Ui, ctx: &egui::Context) {
+fn render_window_controls(ui: &mut Ui, ctx: &egui::Context) {
     let controls = [
         (Color32::from_rgb(255, 95, 87), "Close"),
         (Color32::from_rgb(255, 189, 46), "Minimize"),
@@ -348,9 +348,9 @@ fn window_controls(ui: &mut Ui, ctx: &egui::Context) {
     ];
 
     for (index, (color, label)) in controls.into_iter().enumerate() {
-        let (rect, response) = ui.allocate_exact_size(egui::vec2(14.0, 24.0), Sense::click());
+        let (rect, response) = ui.allocate_exact_size(egui::vec2(16.0, 34.0), Sense::click());
         ui.painter().circle_filled(rect.center(), 6.0, color);
-        let response = response.on_hover_cursor(CursorIcon::PointingHand).on_hover_text(label);
+        let response = response.on_hover_text(label);
         if response.clicked() {
             match index {
                 0 => ctx.send_viewport_cmd(egui::ViewportCommand::Close),
@@ -369,7 +369,6 @@ fn render_output(ui: &mut Ui, app: &App, _scroll: bool, c: &ThemeColors) {
         .auto_shrink([false, false])
         .stick_to_bottom(true)
         .show(ui, |ui| {
-            ui.style_mut().spacing.item_spacing.y = 1.0;
             for line in app.results() {
                 let color = line_color(&line.kind, c);
                 if line.text.is_empty() { ui.add_space(4.0); }
@@ -445,7 +444,7 @@ fn render_input(ui: &mut Ui, app: &mut App, c: &ThemeColors) {
 
             let resp = ui.add(
                 egui::TextEdit::singleline(&mut app.input)
-                    .font(FontId::new(app.font_size, FontFamily::Monospace))
+                    .font(FontId::new(14.0, FontFamily::Monospace))
                     .text_color(c.white)
                     .desired_width(f32::MAX)
                     .frame(false)
@@ -853,7 +852,7 @@ fn render_settings(ctx: &egui::Context, app: &mut App, c: &ThemeColors) {
             // ── About ──
             ui.separator();
             ui.add_space(4.0);
-            ui.label(egui::RichText::new("Ghost Shell v0.7.1").color(c.cyan).size(12.0));
+            ui.label(egui::RichText::new("Ghost Shell v0.8.0").color(c.cyan).size(12.0));
             ui.label(egui::RichText::new("Standalone GUI shell built in Rust with egui").color(c.gray).size(11.0));
             ui.label(egui::RichText::new("Ctrl+T: new tab | Ctrl+L: clear | Ctrl+H: help | Ctrl+D: quit").color(c.gray).size(11.0));
         });

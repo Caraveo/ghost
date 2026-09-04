@@ -45,14 +45,9 @@ struct GhostApp {
 
 impl eframe::App for GhostApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        // Command-T is the native macOS shortcut; Ctrl-T remains useful for
-        // keyboards and remote sessions that do not expose the Command key.
-        if ctx.input(|i| i.key_pressed(egui::Key::T) && (i.modifiers.command || i.modifiers.ctrl)) {
+        // Ctrl+T opens new tab
+        if ctx.input(|i| i.key_pressed(egui::Key::T) && i.modifiers.ctrl) {
             self.app.new_shell_tab();
-        }
-
-        if ctx.input(|i| i.key_pressed(egui::Key::W) && i.modifiers.command) {
-            self.app.close_tab(self.app.active_tab);
         }
 
         // Poll all PTY sessions across tabs
@@ -145,7 +140,6 @@ impl GhostApp {
         }
 
         // Real command — add prompt + output to results
-        self.app.name_active_tab_for_command(trimmed);
         let prompt = self.app.prompt();
         self.app.add_prompt(&prompt, input);
 
@@ -284,11 +278,13 @@ impl GhostApp {
 fn main() -> Result<(), eframe::Error> {
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
-            .with_title("Ghost")
-            .with_inner_size([1180.0, 760.0])
-            .with_min_inner_size([640.0, 400.0])
-            .with_decorations(false)
-            .with_transparent(true)
+            .with_title("Ghost Shell v0.8.0")
+            .with_title_shown(false)
+            .with_titlebar_shown(false)
+            .with_titlebar_buttons_shown(false)
+            .with_fullsize_content_view(true)
+            .with_inner_size([900.0, 600.0])
+            .with_min_inner_size([500.0, 350.0])
             .with_icon(load_icon()),
         ..Default::default()
     };
@@ -325,7 +321,7 @@ fn setup_terminal_font(ctx: &egui::Context) {
 
 fn load_icon() -> egui::IconData {
     eframe::icon_data::from_png_bytes(include_bytes!(
-        "../ghost.icon/Assets/ghost.png"
+        "../ghost Exports/ghost-macOS-Dock-1024x1024.png"
     ))
     .expect("embedded Ghost app icon must be a valid PNG")
 }

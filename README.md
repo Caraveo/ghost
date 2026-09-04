@@ -16,9 +16,12 @@
   <img alt="Rust" src="https://img.shields.io/badge/Rust-stable-orange?logo=rust">
   <img alt="egui 0.29" src="https://img.shields.io/badge/egui-0.29-4f7cff">
   <img alt="macOS" src="https://img.shields.io/badge/platform-macOS-black?logo=apple">
+  <img alt="Version 0.8.0" src="https://img.shields.io/badge/release-v0.8.0-25c2a0">
 </p>
 
 Ghost runs commands in its own macOS window instead of wrapping the Terminal app. Everyday operations can run through its built-in command engine, while interactive programs such as OpenCode and Grok run in dedicated terminal-emulation tabs.
+
+Version 0.8.0 introduces a persistent, streamlined macOS-style tab toolbar with integrated window controls, consistent spacing, and a focused light terminal canvas.
 
 ## Quick Install
 

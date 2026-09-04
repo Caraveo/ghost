@@ -132,7 +132,7 @@ struct AboutTab: View {
             Text("Ghost Shell")
                 .font(.title)
                 .fontWeight(.bold)
-            Text("v0.7.1")
+            Text("v0.8.0")
                 .foregroundColor(.secondary)
             Text("Native macOS shell with responsive terminal emulation")
                 .foregroundColor(.secondary)
@@ -170,6 +170,48 @@ struct SettingsView: View {
 import AppKit
 
 var ghostMenuAction: Int32 = 0
+
+final class GhostToolbarDelegate: NSObject, NSToolbarDelegate {
+    func toolbarAllowedItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
+        [.flexibleSpace]
+    }
+
+    func toolbarDefaultItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
+        [.flexibleSpace]
+    }
+}
+
+private let ghostToolbarDelegate = GhostToolbarDelegate()
+private var ghostMainToolbar: NSToolbar?
+
+@_cdecl("ghost_configure_main_window")
+func ghost_configure_main_window() {
+    func configure() {
+        guard let window = NSApp.mainWindow
+            ?? NSApp.windows.first(where: { !($0 is NSPanel) }) else { return }
+
+        window.titleVisibility = .hidden
+        window.titlebarAppearsTransparent = true
+        window.styleMask.insert(.fullSizeContentView)
+
+        if ghostMainToolbar == nil {
+            let toolbar = NSToolbar(identifier: "GhostMainToolbar")
+            toolbar.delegate = ghostToolbarDelegate
+            toolbar.displayMode = .iconOnly
+            toolbar.showsBaselineSeparator = false
+            ghostMainToolbar = toolbar
+        }
+        window.toolbarStyle = .unified
+        window.toolbar = ghostMainToolbar
+    }
+
+    DispatchQueue.main.async {
+        // eframe creates its NSWindow after the app callback begins. Attaching
+        // the native toolbar after initial layout lets AppKit own the traffic
+        // light geometry on every supported macOS release.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0, execute: configure)
+    }
+}
 
 @_cdecl("ghost_setup_menu")
 func ghost_setup_menu() {
