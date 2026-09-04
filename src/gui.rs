@@ -95,6 +95,10 @@ pub fn render(ctx: &egui::Context, app: &mut App) {
                 let cols = (ui.available_width() / cell_width).floor().max(20.0) as u16;
                 let rows = (ui.available_height() / row_height).floor().max(5.0) as u16;
 
+                app.pty_rect = ui.max_rect();
+                app.pty_cell_w = cell_width;
+                app.pty_cell_h = row_height;
+
                 if let Some(pty) = app.pty_mut().as_mut() {
                     pty.resize(cols, rows);
                     let content = pty
@@ -142,9 +146,18 @@ pub fn render(ctx: &egui::Context, app: &mut App) {
 
 fn handle_pty_input(ctx: &egui::Context, app: &mut App) {
     let events = ctx.input(|i| i.events.clone());
+    let scroll_delta = ctx.input(|i| i.smooth_scroll_delta);
+    let hover_pos = ctx.input(|i| i.pointer.hover_pos());
+
+    let pty_rect = app.pty_rect;
+    let cell_w = app.pty_cell_w;
+    let cell_h = app.pty_cell_h;
+
     let Some(pty) = app.pty_mut().as_mut() else { return };
     let application_cursor = pty.parser.screen().application_cursor();
     let bracketed_paste = pty.parser.screen().bracketed_paste();
+    let mouse_mode = pty.parser.screen().mouse_protocol_mode();
+    let mouse_enc = pty.parser.screen().mouse_protocol_encoding();
 
     for event in events {
         match event {
@@ -188,7 +201,66 @@ fn handle_pty_input(ctx: &egui::Context, app: &mut App) {
                 };
                 if let Some(bytes) = bytes { pty.send(bytes); }
             }
+            egui::Event::PointerButton { pos, button, pressed, .. }
+                if mouse_mode != vt100::MouseProtocolMode::None && pty_rect.contains(pos) =>
+            {
+                let col = ((pos.x - pty_rect.left()) / cell_w).floor().max(0.0) as u16;
+                let row = ((pos.y - pty_rect.top()) / cell_h).floor().max(0.0) as u16;
+                let btn_code = match button {
+                    egui::PointerButton::Primary => 0u8,
+                    egui::PointerButton::Middle => 1u8,
+                    egui::PointerButton::Secondary => 2u8,
+                    _ => continue,
+                };
+                let code = if pressed { btn_code } else { 3 };
+                match mouse_enc {
+                    vt100::MouseProtocolEncoding::Sgr => {
+                        let suffix = if pressed { 'M' } else { 'm' };
+                        let msg = format!("\x1b[<{};{};{}{}", code, col + 1, row + 1, suffix);
+                        pty.send(msg.as_bytes());
+                    }
+                    _ => {
+                        let mut buf = vec![0x1b, b'[', b'M'];
+                        buf.push(32u8 + code);
+                        buf.push((32u16 + col + 1).min(255) as u8);
+                        buf.push((32u16 + row + 1).min(255) as u8);
+                        pty.send(&buf);
+                    }
+                }
+            }
             _ => {}
+        }
+    }
+
+    if scroll_delta.y != 0.0 && hover_pos.map_or(false, |p| pty_rect.contains(p)) {
+        let steps = ((scroll_delta.y.abs() / 30.0).round() as i32).max(1).min(10);
+        if mouse_mode == vt100::MouseProtocolMode::None {
+            let up: &[u8] = if application_cursor { b"\x1bOA" } else { b"\x1b[A" };
+            let down: &[u8] = if application_cursor { b"\x1bOB" } else { b"\x1b[B" };
+            for _ in 0..steps {
+                if scroll_delta.y > 0.0 { pty.send(down); }
+                else { pty.send(up); }
+            }
+        } else {
+            let pos = hover_pos.unwrap();
+            let col = ((pos.x - pty_rect.left()) / cell_w).floor().max(0.0) as u16;
+            let row = ((pos.y - pty_rect.top()) / cell_h).floor().max(0.0) as u16;
+            let button: u8 = if scroll_delta.y > 0.0 { 65 } else { 64 };
+            for _ in 0..steps {
+                match mouse_enc {
+                    vt100::MouseProtocolEncoding::Sgr => {
+                        let msg = format!("\x1b[<{};{};{}M", button, col + 1, row + 1);
+                        pty.send(msg.as_bytes());
+                    }
+                    _ => {
+                        let mut buf = vec![0x1b, b'[', b'M'];
+                        buf.push(32u8 + button);
+                        buf.push((32u16 + col + 1).min(255) as u8);
+                        buf.push((32u16 + row + 1).min(255) as u8);
+                        pty.send(&buf);
+                    }
+                }
+            }
         }
     }
 }

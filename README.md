@@ -9,6 +9,10 @@
 </p>
 
 <p align="center">
+  <img src="assets/screenshot.png" alt="Ghost Screenshot">
+</p>
+
+<p align="center">
   <img alt="Rust" src="https://img.shields.io/badge/Rust-stable-orange?logo=rust">
   <img alt="egui 0.29" src="https://img.shields.io/badge/egui-0.29-4f7cff">
   <img alt="macOS" src="https://img.shields.io/badge/platform-macOS-black?logo=apple">
@@ -20,11 +24,12 @@ Ghost runs commands in its own macOS window instead of wrapping the Terminal app
 
 Download the latest signed universal macOS build from [Releases](https://github.com/Caraveo/ghost/releases/latest), unzip it, and drag **Ghost.app** into **Applications**.
 
-Or install it from Terminal:
+Or install it from Terminal. Because this repository is private, authenticate
+the GitHub CLI first with `gh auth login`:
 
 ```sh
-curl -L https://github.com/Caraveo/ghost/releases/latest/download/Ghost-macOS-universal.zip -o Ghost.zip
-ditto -x -k Ghost.zip .
+gh release download --repo Caraveo/ghost --pattern 'Ghost-macOS-universal.zip' --clobber
+ditto -x -k Ghost-macOS-universal.zip .
 open Ghost.app
 ```
 

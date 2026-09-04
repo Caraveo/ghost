@@ -190,6 +190,9 @@ pub struct App {
     pub auto_switch_pty: bool,
     pub show_startup_msg: bool,
     pub safety_enabled: bool,
+    pub pty_rect: egui::Rect,
+    pub pty_cell_w: f32,
+    pub pty_cell_h: f32,
 }
 
 impl App {
@@ -240,6 +243,9 @@ impl App {
             auto_switch_pty: true,
             show_startup_msg: true,
             safety_enabled: true,
+            pty_rect: egui::Rect::NOTHING,
+            pty_cell_w: 8.0,
+            pty_cell_h: 16.0,
         }
     }
 
